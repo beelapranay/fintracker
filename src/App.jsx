@@ -19,7 +19,11 @@ const CATEGORIES = {
 }
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
-const fmt = n => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const fmt = n => {
+  const value = Number(n)
+  const formatted = Math.abs(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return `${value < 0 ? '-' : ''}$${formatted}`
+}
 const today = () => new Date().toISOString().slice(0, 10)
 const parseDateParts = date => {
   const [year, month, day] = String(date || '').split('-').map(Number)
@@ -151,8 +155,8 @@ function ExpenseModal({ expense, onClose, onSave }) {
       setError('Date and category are required.')
       return
     }
-    if (!form.amount || isNaN(form.amount) || Number(form.amount) <= 0) {
-      setError('Enter an amount greater than 0.')
+    if (!form.amount || isNaN(form.amount) || Number(form.amount) === 0) {
+      setError('Enter a non-zero amount.')
       return
     }
     setSaving(true)
@@ -186,7 +190,7 @@ function ExpenseModal({ expense, onClose, onSave }) {
           </div>
           <div>
             <label style={styles.label}>Amount (USD)</label>
-            <input type="number" placeholder="0.00" min="0" step="0.01" value={form.amount} onChange={e => set('amount', e.target.value)} />
+            <input type="number" placeholder="-25.00 or 25.00" step="0.01" value={form.amount} onChange={e => set('amount', e.target.value)} />
           </div>
         </div>
         <div style={styles.grid2}>
@@ -237,6 +241,11 @@ function Dashboard({ expenses }) {
     filtered.forEach(e => { map[e.category] = (map[e.category] || 0) + e.amount })
     return Object.entries(map).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value)
   }, [filtered])
+  const spendingByCategory = useMemo(() => {
+    const map = {}
+    filtered.filter(e => e.amount > 0).forEach(e => { map[e.category] = (map[e.category] || 0) + e.amount })
+    return Object.entries(map).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value)
+  }, [filtered])
 
   const years = Array.from(new Set([selYear, ...expenses.map(e => parseDateParts(e.date).year).filter(Boolean)])).sort()
 
@@ -254,7 +263,7 @@ function Dashboard({ expenses }) {
 
       <div style={styles.cards}>
         {[
-          { label: 'Total Spent',          value: fmt(total),                                        accent: true },
+          { label: 'Net Spent',            value: fmt(total),                                        accent: true },
           { label: 'Transactions',          value: filtered.length },
           { label: 'Avg per Transaction',   value: filtered.length ? fmt(total / filtered.length) : '$0.00' },
           { label: 'Top Category',          value: byCategory[0]?.name || '—',                       small: true },
@@ -271,26 +280,32 @@ function Dashboard({ expenses }) {
           <div style={styles.chartsRow}>
             <div style={styles.chartBox}>
               <p style={styles.chartTitle}>Spending by Category</p>
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie data={byCategory} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={90} paddingAngle={3}>
-                    {byCategory.map(d => <Cell key={d.name} fill={CATEGORIES[d.name]?.color || '#6b6b88'} />)}
-                  </Pie>
-                  <Tooltip content={<CustomTooltip />} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 14px', justifyContent: 'center', marginTop: 4 }}>
-                {byCategory.map(d => (
-                  <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: CATEGORIES[d.name]?.color, flexShrink: 0 }} />
-                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{d.name}</span>
+              {spendingByCategory.length > 0 ? (
+                <>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <PieChart>
+                      <Pie data={spendingByCategory} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={90} paddingAngle={3}>
+                        {spendingByCategory.map(d => <Cell key={d.name} fill={CATEGORIES[d.name]?.color || '#6b6b88'} />)}
+                      </Pie>
+                      <Tooltip content={<CustomTooltip />} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 14px', justifyContent: 'center', marginTop: 4 }}>
+                    {spendingByCategory.map(d => (
+                      <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: CATEGORIES[d.name]?.color, flexShrink: 0 }} />
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{d.name}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </>
+              ) : (
+                <div style={styles.empty}><p>No positive spending for this period</p></div>
+              )}
             </div>
 
             <div style={styles.chartBox}>
-              <p style={styles.chartTitle}>Amount by Category</p>
+              <p style={styles.chartTitle}>Net Amount by Category</p>
               <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={byCategory} layout="vertical" margin={{ left: 0, right: 20, top: 5, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#2a2a38" horizontal={false} />
@@ -306,7 +321,7 @@ function Dashboard({ expenses }) {
           </div>
 
           <div style={{ marginTop: 24 }}>
-            <p style={styles.chartTitle}>Breakdown</p>
+            <p style={styles.chartTitle}>Net Breakdown</p>
             <div style={styles.table}>
               <div style={styles.tableHead}><span>Category</span><span style={{ textAlign: 'right' }}>Amount</span><span style={{ textAlign: 'right' }}>% of total</span></div>
               {byCategory.map(d => (
@@ -315,8 +330,8 @@ function Dashboard({ expenses }) {
                     <span style={{ width: 8, height: 8, borderRadius: '50%', background: CATEGORIES[d.name]?.color, flexShrink: 0 }} />
                     {d.name}
                   </span>
-                  <span style={{ textAlign: 'right', color: 'var(--accent)' }}>{fmt(d.value)}</span>
-                  <span style={{ textAlign: 'right', color: 'var(--text-muted)' }}>{((d.value / total) * 100).toFixed(1)}%</span>
+                  <span style={{ textAlign: 'right', color: d.value < 0 ? 'var(--red)' : 'var(--accent)' }}>{fmt(d.value)}</span>
+                  <span style={{ textAlign: 'right', color: 'var(--text-muted)' }}>{total ? `${((d.value / total) * 100).toFixed(1)}%` : '—'}</span>
                 </div>
               ))}
             </div>
@@ -390,7 +405,7 @@ function ExpenseList({ expenses, onEdit, onDelete }) {
                 {e.sub && <span style={{ fontSize: 11, color: 'var(--text-muted)', paddingLeft: 13 }}>{e.sub}</span>}
               </span>
               <span style={{ color: 'var(--text-muted)', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.note || '—'}</span>
-              <span style={{ textAlign: 'right', color: 'var(--accent)', fontSize: 13 }}>{fmt(e.amount)}</span>
+              <span style={{ textAlign: 'right', color: e.amount < 0 ? 'var(--red)' : 'var(--accent)', fontSize: 13 }}>{fmt(e.amount)}</span>
               <span style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                 <button className="btn-ghost btn-compact" onClick={() => onEdit(e)}>Edit</button>
                 <button className="btn-danger" onClick={() => onDelete(e.id)}>Delete</button>

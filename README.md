@@ -59,6 +59,8 @@ npm run dev
 
 Sign up with your email, confirm it via the email link, log in.
 
+Use positive amounts for spending and negative amounts for reimbursements or money paid back to you.
+
 ---
 
 ## Step 4 — Deploy to Vercel
