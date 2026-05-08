@@ -15,9 +15,12 @@ const CATEGORIES = {
   'Transportation':      { color: '#ff7b5e', subs: ['Cab', 'Train', 'Bus'] },
   'Subscriptions':       { color: '#5eceff', subs: [] },
   'Entertainment':       { color: '#ff5566', subs: [] },
+  'Income & Reimbursements': { color: '#2ee59d', subs: ['Friend payback', 'Refund', 'Paycheck', 'Other'] },
   'Misc':                { color: '#6b6b88', subs: [] },
 }
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+const DEFAULT_CATEGORY = 'Groceries & Snacks'
+const INCOME_CATEGORY = 'Income & Reimbursements'
 
 const fmt = n => {
   const value = Number(n)
@@ -138,7 +141,7 @@ function ExpenseModal({ expense, onClose, onSave }) {
   const isEditing = Boolean(expense)
   const [form, setForm]     = useState({
     date: expense?.date || today(),
-    category: expense?.category || 'Groceries & Snacks',
+    category: expense?.category || DEFAULT_CATEGORY,
     sub: expense?.sub || '',
     amount: expense?.amount ? String(expense.amount) : '',
     note: expense?.note || '',
@@ -147,6 +150,11 @@ function ExpenseModal({ expense, onClose, onSave }) {
   const [error, setError]   = useState('')
   const subs = CATEGORIES[form.category]?.subs || []
   const set  = (k, v) => setForm(f => ({ ...f, [k]: v, ...(k === 'category' ? { sub: '' } : {}) }))
+  const setAmount = value => setForm(f => ({
+    ...f,
+    amount: value,
+    ...(Number(value) < 0 && f.category === DEFAULT_CATEGORY ? { category: INCOME_CATEGORY, sub: '' } : {}),
+  }))
 
   const submit = async () => {
     if (saving) return
@@ -190,7 +198,7 @@ function ExpenseModal({ expense, onClose, onSave }) {
           </div>
           <div>
             <label style={styles.label}>Amount (USD)</label>
-            <input type="number" placeholder="-25.00 or 25.00" step="0.01" value={form.amount} onChange={e => set('amount', e.target.value)} />
+            <input type="number" placeholder="-25.00 or 25.00" step="0.01" value={form.amount} onChange={e => setAmount(e.target.value)} />
           </div>
         </div>
         <div style={styles.grid2}>
