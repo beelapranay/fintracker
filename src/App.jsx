@@ -338,7 +338,7 @@ function Dashboard({ expenses }) {
                     <span style={{ width: 8, height: 8, borderRadius: '50%', background: CATEGORIES[d.name]?.color, flexShrink: 0 }} />
                     {d.name}
                   </span>
-                  <span style={{ textAlign: 'right', color: d.value < 0 ? 'var(--red)' : 'var(--accent)' }}>{fmt(d.value)}</span>
+                  <span style={{ textAlign: 'right', color: d.value < 0 ? 'var(--accent)' : 'var(--red)' }}>{fmt(d.value)}</span>
                   <span style={{ textAlign: 'right', color: 'var(--text-muted)' }}>{total ? `${((d.value / total) * 100).toFixed(1)}%` : '—'}</span>
                 </div>
               ))}
@@ -413,7 +413,7 @@ function ExpenseList({ expenses, onEdit, onDelete }) {
                 {e.sub && <span style={{ fontSize: 11, color: 'var(--text-muted)', paddingLeft: 13 }}>{e.sub}</span>}
               </span>
               <span style={{ color: 'var(--text-muted)', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.note || '—'}</span>
-              <span style={{ textAlign: 'right', color: e.amount < 0 ? 'var(--red)' : 'var(--accent)', fontSize: 13 }}>{fmt(e.amount)}</span>
+              <span style={{ textAlign: 'right', color: e.amount < 0 ? 'var(--accent)' : 'var(--red)', fontSize: 13 }}>{fmt(e.amount)}</span>
               <span style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                 <button className="btn-ghost btn-compact" onClick={() => onEdit(e)}>Edit</button>
                 <button className="btn-danger" onClick={() => onDelete(e.id)}>Delete</button>
