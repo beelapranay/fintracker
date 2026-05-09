@@ -21,7 +21,18 @@ create table expenses (
   created_at timestamptz default now()
 );
 
+create table expense_categories (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users not null,
+  name text not null,
+  color text not null default '#6b6b88',
+  subs text[] not null default '{}',
+  created_at timestamptz default now(),
+  unique (user_id, name)
+);
+
 alter table expenses enable row level security;
+alter table expense_categories enable row level security;
 
 create policy "own expenses select" on expenses
   for select using (auth.uid() = user_id);
@@ -34,6 +45,19 @@ create policy "own expenses update" on expenses
   with check (auth.uid() = user_id);
 
 create policy "own expenses delete" on expenses
+  for delete using (auth.uid() = user_id);
+
+create policy "own categories select" on expense_categories
+  for select using (auth.uid() = user_id);
+
+create policy "own categories insert" on expense_categories
+  for insert with check (auth.uid() = user_id);
+
+create policy "own categories update" on expense_categories
+  for update using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create policy "own categories delete" on expense_categories
   for delete using (auth.uid() = user_id);
 ```
 
