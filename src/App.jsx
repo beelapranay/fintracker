@@ -7,21 +7,20 @@ import { Plus, LayoutDashboard, List, PlusCircle, LogOut } from 'lucide-react'
 import { supabase, supabaseConfigError } from './supabase'
 
 // ─── Data config ─────────────────────────────────────────────────────────────
-const DEFAULT_CATEGORIES = {
+const CATEGORIES = {
   'Rent':                { color: '#4d9fff', subs: [] },
-  'Groceries & Snacks':  { color: '#00e5a0', subs: [] },
-  'Outside Food':        { color: '#ffb340', subs: [] },
-  'Utilities':           { color: '#c97bff', subs: [] },
-  'Transportation':      { color: '#ff7b5e', subs: [] },
+  'Groceries & Snacks':  { color: '#00e5a0', subs: ['Stop & Shop', 'Walmart', 'Roxbury Market', 'Wollastons', 'Other'] },
+  'Outside Food':        { color: '#ffb340', subs: ['In-person', 'Uber Eats', 'DoorDash'] },
+  'Utilities':           { color: '#c97bff', subs: ['Gas Bill', 'Phone EMI', 'Phone Data', 'Electricity'] },
+  'Transportation':      { color: '#ff7b5e', subs: ['Cab', 'Train', 'Bus'] },
   'Subscriptions':       { color: '#5eceff', subs: [] },
   'Entertainment':       { color: '#ff5566', subs: [] },
-  'Income & Reimbursements': { color: '#2ee59d', subs: [] },
+  'Income & Reimbursements': { color: '#2ee59d', subs: ['Friend payback', 'Refund', 'Paycheck', 'Other'] },
   'Misc':                { color: '#6b6b88', subs: [] },
 }
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 const DEFAULT_CATEGORY = 'Groceries & Snacks'
 const INCOME_CATEGORY = 'Income & Reimbursements'
-const CATEGORY_COLORS = ['#4d9fff', '#00e5a0', '#ffb340', '#c97bff', '#ff7b5e', '#5eceff', '#ff5566', '#2ee59d', '#6b6b88']
 
 const fmt = n => {
   const value = Number(n)
@@ -37,10 +36,6 @@ const dateSortValue = date => {
   const { year, month, day } = parseDateParts(date)
   return Date.UTC(year || 0, month || 0, day || 1)
 }
-const rowsToCategories = rows => rows.reduce((map, row) => ({
-  ...map,
-  [row.name]: { id: row.id, color: row.color || '#6b6b88', subs: row.subs || [] },
-}), {})
 
 function ConfigErrorScreen() {
   return (
@@ -130,19 +125,19 @@ function AuthScreen() {
 }
 
 // ─── Tooltip ──────────────────────────────────────────────────────────────────
-const CustomTooltip = ({ active, payload, categories }) => {
+const CustomTooltip = ({ active, payload }) => {
   if (!active || !payload?.length) return null
   return (
     <div style={{ background: '#1a1a24', border: '1px solid #2a2a38', borderRadius: 8, padding: '8px 14px' }}>
       <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: '#e8e8f0' }}>
-        {payload[0].name}: <span style={{ color: categories[payload[0].name]?.color || '#00e5a0' }}>{fmt(payload[0].value)}</span>
+        {payload[0].name}: <span style={{ color: CATEGORIES[payload[0].name]?.color || '#00e5a0' }}>{fmt(payload[0].value)}</span>
       </p>
     </div>
   )
 }
 
 // ─── Expense Modal ────────────────────────────────────────────────────────────
-function ExpenseModal({ expense, categories, onClose, onSave, onAddCategory, onAddSubcategory }) {
+function ExpenseModal({ expense, onClose, onSave }) {
   const isEditing = Boolean(expense)
   const [form, setForm]     = useState({
     date: expense?.date || today(),
@@ -153,39 +148,13 @@ function ExpenseModal({ expense, categories, onClose, onSave, onAddCategory, onA
   })
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState('')
-  const categoryNames = Object.keys(categories)
-  const options = form.category && !categories[form.category] ? [form.category, ...categoryNames] : categoryNames
-  const subs = categories[form.category]?.subs || []
+  const subs = CATEGORIES[form.category]?.subs || []
   const set  = (k, v) => setForm(f => ({ ...f, [k]: v, ...(k === 'category' ? { sub: '' } : {}) }))
   const setAmount = value => setForm(f => ({
     ...f,
     amount: value,
     ...(Number(value) < 0 && f.category === DEFAULT_CATEGORY ? { category: INCOME_CATEGORY, sub: '' } : {}),
   }))
-  const addCategory = async () => {
-    const name = window.prompt('Category name')
-    const clean = name?.trim()
-    if (!clean) return
-    setError('')
-    try {
-      await onAddCategory(clean)
-      setForm(f => ({ ...f, category: clean, sub: '' }))
-    } catch (e) {
-      setError(e.message || 'Could not add category.')
-    }
-  }
-  const addSubcategory = async () => {
-    const name = window.prompt(`Subcategory for ${form.category}`)
-    const clean = name?.trim()
-    if (!clean) return
-    setError('')
-    try {
-      await onAddSubcategory(form.category, clean)
-      setForm(f => ({ ...f, sub: clean }))
-    } catch (e) {
-      setError(e.message || 'Could not add subcategory.')
-    }
-  }
 
   const submit = async () => {
     if (saving) return
@@ -235,27 +204,19 @@ function ExpenseModal({ expense, categories, onClose, onSave, onAddCategory, onA
         <div style={styles.grid2}>
           <div>
             <label style={styles.label}>Category</label>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <select value={form.category} onChange={e => set('category', e.target.value)}>
-                {options.map(c => <option key={c}>{c}</option>)}
+            <select value={form.category} onChange={e => set('category', e.target.value)}>
+              {Object.keys(CATEGORIES).map(c => <option key={c}>{c}</option>)}
+            </select>
+          </div>
+          {subs.length > 0 && (
+            <div>
+              <label style={styles.label}>Subcategory</label>
+              <select value={form.sub} onChange={e => set('sub', e.target.value)}>
+                <option value="">— select —</option>
+                {subs.map(s => <option key={s}>{s}</option>)}
               </select>
-              <button type="button" className="btn-ghost btn-compact" onClick={addCategory}>New</button>
             </div>
-          </div>
-          <div>
-            <label style={styles.label}>Subcategory</label>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {subs.length > 0 ? (
-                <select value={form.sub} onChange={e => set('sub', e.target.value)}>
-                  <option value="">None</option>
-                  {subs.map(s => <option key={s}>{s}</option>)}
-                </select>
-              ) : (
-                <input type="text" value="" placeholder="None" disabled />
-              )}
-              <button type="button" className="btn-ghost btn-compact" onClick={addSubcategory}>New</button>
-            </div>
-          </div>
+          )}
         </div>
         <div>
           <label style={styles.label}>Note (optional)</label>
@@ -272,7 +233,7 @@ function ExpenseModal({ expense, categories, onClose, onSave, onAddCategory, onA
 }
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
-function Dashboard({ expenses, categories }) {
+function Dashboard({ expenses }) {
   const now = new Date()
   const [selMonth, setSelMonth] = useState(now.getMonth())
   const [selYear,  setSelYear]  = useState(now.getFullYear())
@@ -332,15 +293,15 @@ function Dashboard({ expenses, categories }) {
                   <ResponsiveContainer width="100%" height={220}>
                     <PieChart>
                       <Pie data={spendingByCategory} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={90} paddingAngle={3}>
-                        {spendingByCategory.map(d => <Cell key={d.name} fill={categories[d.name]?.color || '#6b6b88'} />)}
+                        {spendingByCategory.map(d => <Cell key={d.name} fill={CATEGORIES[d.name]?.color || '#6b6b88'} />)}
                       </Pie>
-                      <Tooltip content={<CustomTooltip categories={categories} />} />
+                      <Tooltip content={<CustomTooltip />} />
                     </PieChart>
                   </ResponsiveContainer>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 14px', justifyContent: 'center', marginTop: 4 }}>
                     {spendingByCategory.map(d => (
                       <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: categories[d.name]?.color || '#6b6b88', flexShrink: 0 }} />
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: CATEGORIES[d.name]?.color, flexShrink: 0 }} />
                         <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{d.name}</span>
                       </div>
                     ))}
@@ -358,9 +319,9 @@ function Dashboard({ expenses, categories }) {
                   <CartesianGrid strokeDasharray="3 3" stroke="#2a2a38" horizontal={false} />
                   <XAxis type="number" tick={{ fill: '#6b6b88', fontSize: 11, fontFamily: 'DM Mono' }} tickFormatter={v => '$' + v} />
                   <YAxis type="category" dataKey="name" width={120} tick={{ fill: '#9090b0', fontSize: 11, fontFamily: 'DM Mono' }} />
-                  <Tooltip content={<CustomTooltip categories={categories} />} />
+                  <Tooltip content={<CustomTooltip />} />
                   <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                    {byCategory.map(d => <Cell key={d.name} fill={categories[d.name]?.color || '#6b6b88'} />)}
+                    {byCategory.map(d => <Cell key={d.name} fill={CATEGORIES[d.name]?.color || '#6b6b88'} />)}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -374,7 +335,7 @@ function Dashboard({ expenses, categories }) {
               {byCategory.map(d => (
                 <div key={d.name} style={styles.tableRow} className="table-row-hover">
                   <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: categories[d.name]?.color || '#6b6b88', flexShrink: 0 }} />
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: CATEGORIES[d.name]?.color, flexShrink: 0 }} />
                     {d.name}
                   </span>
                   <span style={{ textAlign: 'right', color: d.value < 0 ? 'var(--accent)' : 'var(--red)' }}>{fmt(d.value)}</span>
@@ -396,11 +357,10 @@ function Dashboard({ expenses, categories }) {
 }
 
 // ─── Expense List ─────────────────────────────────────────────────────────────
-function ExpenseList({ expenses, categories, onEdit, onDelete }) {
+function ExpenseList({ expenses, onEdit, onDelete }) {
   const [filterCat,   setFilterCat]   = useState('All')
   const [filterMonth, setFilterMonth] = useState(-1)
   const [filterYear,  setFilterYear]  = useState(-1)
-  const categoryNames = Array.from(new Set([...Object.keys(categories), ...expenses.map(e => e.category)])).filter(Boolean)
   const years = Array.from(new Set(expenses.map(e => parseDateParts(e.date).year).filter(Boolean))).sort().reverse()
 
   const filtered = useMemo(() => expenses
@@ -420,7 +380,7 @@ function ExpenseList({ expenses, categories, onEdit, onDelete }) {
       <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
         <select value={filterCat} onChange={e => setFilterCat(e.target.value)} style={{ width: 'auto', padding: '6px 12px' }}>
           <option value="All">All categories</option>
-          {categoryNames.map(c => <option key={c}>{c}</option>)}
+          {Object.keys(CATEGORIES).map(c => <option key={c}>{c}</option>)}
         </select>
         <select value={filterMonth} onChange={e => setFilterMonth(+e.target.value)} style={{ width: 'auto', padding: '6px 12px' }}>
           <option value={-1}>All months</option>
@@ -447,7 +407,7 @@ function ExpenseList({ expenses, categories, onEdit, onDelete }) {
               <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{e.date}</span>
               <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: categories[e.category]?.color || '#6b6b88', flexShrink: 0 }} />
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: CATEGORIES[e.category]?.color, flexShrink: 0 }} />
                   <span style={{ fontSize: 13 }}>{e.category}</span>
                 </span>
                 {e.sub && <span style={{ fontSize: 11, color: 'var(--text-muted)', paddingLeft: 13 }}>{e.sub}</span>}
@@ -471,7 +431,6 @@ export default function App() {
   const [session,   setSession]   = useState(null)
   const [authReady, setAuthReady] = useState(false)
   const [expenses,  setExpenses]  = useState([])
-  const [categories, setCategories] = useState(DEFAULT_CATEGORIES)
   const [loading,   setLoading]   = useState(true)
   const [error,     setError]     = useState('')
   const [tab,       setTab]       = useState('dashboard')
@@ -516,34 +475,15 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (!session || !supabase) { setExpenses([]); setCategories(DEFAULT_CATEGORIES); setLoading(false); return }
+    if (!session || !supabase) { setExpenses([]); setLoading(false); return }
     setLoading(true)
     setError('')
-    Promise.all([
-      supabase.from('expenses').select('*').order('date', { ascending: false }),
-      supabase.from('expense_categories').select('*').order('name', { ascending: true }),
-    ])
-      .then(async ([expenseResult, categoryResult]) => {
-        if (expenseResult.error) throw expenseResult.error
-        if (categoryResult.error) throw categoryResult.error
-
-        let categoryRows = categoryResult.data || []
-        if (categoryRows.length === 0) {
-          const defaults = Object.entries(DEFAULT_CATEGORIES).map(([name, config]) => ({
-            user_id: session.user.id,
-            name,
-            color: config.color,
-            subs: config.subs,
-          }))
-          const { data, error } = await supabase.from('expense_categories').insert(defaults).select()
-          if (error) throw error
-          categoryRows = data || []
-        }
-
-        setCategories(rowsToCategories(categoryRows))
-        setExpenses(expenseResult.data || [])
+    supabase.from('expenses').select('*').order('date', { ascending: false })
+      .then(({ data, error }) => {
+        if (error) throw error
+        setExpenses(data || [])
       })
-      .catch(e => setError(e.message || 'Could not load expenses. Make sure your Supabase tables are set up.'))
+      .catch(e => setError(e.message || 'Could not load expenses.'))
       .finally(() => setLoading(false))
   }, [session])
 
@@ -564,36 +504,6 @@ export default function App() {
     if (error) throw error
     if (!data) throw new Error('Supabase did not return the updated expense.')
     setExpenses(prev => prev.map(e => e.id === id ? data : e))
-  }
-
-  const addCategory = async (name) => {
-    const clean = name.trim()
-    if (!clean) throw new Error('Category name is required.')
-    if (categories[clean]) throw new Error('That category already exists.')
-
-    const color = CATEGORY_COLORS[Object.keys(categories).length % CATEGORY_COLORS.length]
-    const { data, error } = await supabase.from('expense_categories')
-      .insert([{ user_id: session.user.id, name: clean, color, subs: [] }])
-      .select().single()
-    if (error) throw error
-    setCategories(prev => ({ ...prev, [data.name]: { id: data.id, color: data.color, subs: data.subs || [] } }))
-  }
-
-  const addSubcategory = async (categoryName, subcategoryName) => {
-    const clean = subcategoryName.trim()
-    if (!clean) throw new Error('Subcategory name is required.')
-
-    const category = categories[categoryName]
-    if (!category?.id) throw new Error('Save this category before adding subcategories.')
-    if (category.subs.includes(clean)) throw new Error('That subcategory already exists.')
-
-    const subs = [...category.subs, clean]
-    const { data, error } = await supabase.from('expense_categories')
-      .update({ subs })
-      .eq('id', category.id)
-      .select().single()
-    if (error) throw error
-    setCategories(prev => ({ ...prev, [data.name]: { id: data.id, color: data.color, subs: data.subs || [] } }))
   }
 
   const deleteExpense = async (id) => {
@@ -651,8 +561,8 @@ export default function App() {
           {loading
             ? <div style={styles.empty}><p style={{ color: 'var(--text-muted)' }}>Loading expenses...</p></div>
             : tab === 'dashboard'
-              ? <Dashboard expenses={expenses} categories={categories} />
-              : <ExpenseList expenses={expenses} categories={categories} onEdit={openEditModal} onDelete={deleteExpense} />
+              ? <Dashboard expenses={expenses} />
+              : <ExpenseList expenses={expenses} onEdit={openEditModal} onDelete={deleteExpense} />
           }
         </div>
       </main>
@@ -672,11 +582,8 @@ export default function App() {
       {showModal && (
         <ExpenseModal
           expense={editingExpense}
-          categories={categories}
           onClose={closeModal}
           onSave={form => editingExpense ? updateExpense(editingExpense.id, form) : addExpense(form)}
-          onAddCategory={addCategory}
-          onAddSubcategory={addSubcategory}
         />
       )}
     </div>
